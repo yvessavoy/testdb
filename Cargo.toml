@@ -1,0 +1,11 @@
+[package]
+name = "testdb"
+version = "0.0.1"
+authors = ["Yves Savoy <10594588+yvessavoy@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+sqlx = { version = "0.5", features = [ "postgres", "runtime-async-std-rustls" ], default-features = false }
+rand = "0.8.3"
+futures = "0.3"
+async-std = { version = "1.9.0", features = ["attributes"] }
