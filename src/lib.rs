@@ -2,7 +2,6 @@ use sqlx::Connection;
 use sqlx::PgConnection;
 use sqlx::PgPool;
 use sqlx::Postgres;
-use std::env;
 
 #[derive(Debug)]
 pub struct TestDb {
@@ -17,10 +16,7 @@ impl TestDb {
     pub async fn new<F: FnOnce(PgConnection) -> ()>(database_url: &str, setup_fn: F) -> Self {
         let db_url = generate_random_db_url(database_url);
 
-        // Find the necessary parts of the url
-        let separator_pos = db_url.rfind("/").unwrap();
-        let pg_conn = &db_url[..=separator_pos];
-        let db_name = &db_url[separator_pos + 1..];
+        let (pg_conn, db_name) = split_database_url(&db_url);
         
         // Create the database
         let mut conn = PgConnection::connect(pg_conn).await.unwrap();
@@ -56,13 +52,21 @@ impl Drop for TestDb {
     }
 }
 
+fn split_database_url(db_url: &str) -> (&str, &str) {
+    let separator_pos = db_url.rfind("/").unwrap();
+    let pg_conn = &db_url[..=separator_pos];
+    let db_name = &db_url[separator_pos + 1..];
+
+    (pg_conn, db_name)
+}
+
 fn generate_random_db_url(database_url: &str) -> String {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
 
     // Set up the database per tests
     let rng = thread_rng();
-    let suffix: String = rng.sample_iter(&Alphanumeric).take(16).collect();
+    let suffix: String = rng.sample_iter(&Alphanumeric).take(16).map(char::from).collect();
     format!("{}_{}", database_url, suffix)
 }
 
@@ -95,10 +99,10 @@ mod tests {
     use super::*;
 
     #[async_std::test]
-    async fn test_db() {
-        let url = env!("DATABASE_URL");
-        let db = TestDb::new(url, |connection| {
-
-        }).await;
+    async fn test_split_database_url() {
+        let url = "postgres://user:password@host/testdb";
+        let (conn, name) = split_database_url(url);
+        assert_eq!(conn, "postgres://user:password@host/");
+        assert_eq!(name, "testdb");
     }
 }
