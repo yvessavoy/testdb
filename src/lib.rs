@@ -14,7 +14,7 @@ pub struct TestDb {
 
 /// Sets up a new DB for running tests with.
 impl TestDb {
-    pub async fn new<F>(database_url: &str, setup_fn: F) where F: FnOnce(PgConnection) -> () -> Self {
+    pub async fn new<F: FnOnce(PgConnection) -> ()>(database_url: &str, setup_fn: F) -> Self {
         let db_url = generate_random_db_url(database_url);
 
         // Find the necessary parts of the url
@@ -33,11 +33,9 @@ impl TestDb {
         // Run the user provided setup fn with a connection
         setup_fn(conn);
 
-        let db_pool = PgPool::connect(&db_url).await.unwrap();
-
         Self {
             db_url: db_url.clone(),
-            db_pool: Some(db_pool),
+            db_pool: Some(PgPool::connect(&db_url).await.unwrap()),
             connection: pg_conn.to_string(),
             name: db_name.to_string(),
         }
@@ -54,7 +52,7 @@ impl Drop for TestDb {
         let _ = self.db_pool.take();
 
         // Disconnect all client and drop the database
-        futures::executor::block_on(drop_db(&self.db_url));
+        futures::executor::block_on(drop_db(&self.db_url, &self.connection, &self.name));
     }
 }
 
@@ -68,18 +66,7 @@ fn generate_random_db_url(database_url: &str) -> String {
     format!("{}_{}", database_url, suffix)
 }
 
-fn parse_db_url(db_url: &str) -> (&str, &str) {
-    // Create the DB, splitting the url on the last slash
-    // postgres://localhost/legasea_test_aoeuaoeu
-    let separator_pos = db_url.rfind("/").unwrap();
-    let pg_conn = &db_url[..=separator_pos];
-    let db_name = &db_url[separator_pos + 1..];
-    (pg_conn, db_name)
-}
-
-/// For use by TEST code to set up the DB.
-async fn drop_db(db_url: &str) {
-    let (pg_conn, db_name) = parse_db_url(db_url);
+async fn drop_db(db_url: &str, pg_conn: &str, db_name: &str) {
     let mut conn = PgConnection::connect(pg_conn).await.unwrap();
 
     // Disconnect any existing connections to the DB
@@ -103,31 +90,13 @@ AND pid <> pg_backend_pid();"#,
         .unwrap();
 }
 
-async fn run_migrations(db_url: &str) {
-    let (pg_conn, db_name) = parse_db_url(db_url);
-    let mut conn = PgConnection::connect(&format!("{}/{}", pg_conn, db_name))
-        .await
-        .unwrap();
-
-    // Run the migrations
-    let sql = async_std::fs::read_to_string("../schema.sql")
-        .await
-        .unwrap();
-
-    for query in sql.split(';') {
-        sqlx::query::<Postgres>(&query)
-            .execute(&mut conn)
-            .await
-            .unwrap();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[async_std::test]
     async fn test_db() {
+        let url = env!("DATABASE_URL");
         let db = TestDb::new(url, |connection| {
 
         }).await;
