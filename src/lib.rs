@@ -17,7 +17,7 @@ impl TestDb {
         let db_url = generate_random_db_url(database_url);
 
         let (pg_conn, db_name) = split_database_url(&db_url);
-        
+
         // Create the database
         let mut conn = PgConnection::connect(pg_conn).await.unwrap();
         let sql = format!(r#"CREATE DATABASE "{}""#, &db_name);
@@ -35,6 +35,10 @@ impl TestDb {
             connection: pg_conn.to_string(),
             name: db_name.to_string(),
         }
+    }
+
+    pub fn url(&self) -> String {
+        self.db_url.clone()
     }
 
     pub fn db(&self) -> PgPool {
@@ -66,7 +70,11 @@ fn generate_random_db_url(database_url: &str) -> String {
 
     // Set up the database per tests
     let rng = thread_rng();
-    let suffix: String = rng.sample_iter(&Alphanumeric).take(16).map(char::from).collect();
+    let suffix: String = rng
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect();
     format!("{}_{}", database_url, suffix)
 }
 
