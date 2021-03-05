@@ -9,3 +9,6 @@ sqlx = { version = "0.5", features = [ "postgres", "runtime-async-std-rustls" ],
 rand = "0.8.3"
 futures = "0.3"
 async-std = { version = "1.9.0", features = ["attributes"] }
+
+[dev-dependencies]
+dotenv = "0.15.0"

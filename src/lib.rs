@@ -27,7 +27,7 @@ impl TestDb {
             .unwrap();
 
         // Run the user provided setup fn with a connection
-        setup_fn(conn);
+        setup_fn(PgConnection::connect(&db_url).await.unwrap());
 
         Self {
             db_url: db_url.clone(),
